@@ -43,6 +43,10 @@
 - 流程
 
   ![](./assets/Snipaste_2024-01-10_19-20-56.jpg)
+  
+  - 前端会将登录的token保存到session
+  
+    ![](./assets/Snipaste_2024-01-16_17-46-07.jpg)
 
 ### 1.3 技术细节
 
@@ -153,3 +157,42 @@
 | **互斥锁**   | 没有额外的内存消耗<br/>保证一致性<br/>实现简单 | 线程需要等待，性能受影响<br/>可能有死锁封信啊 |
 | **逻辑过期** | 线程无需等待，性能较好                         | 不保证一致性<br/>有额外内存消耗<br/>实现复杂  |
 
+## 3. 优惠券秒杀
+
+### 3.1 全局唯一id
+
+- 订单表`tb_voucher_order`使用数据库自增id的缺点
+  - id的规律性太明显
+  - 受单表数据量的限制
+
+- **全局唯一id**需要满足的特性
+
+  - 唯一性
+  - 高可用
+  - 递增性
+  - 高性能
+  - 安全性
+
+- 全局唯一id生成策略
+
+  - UUID
+  - redis自增
+  - snowflake算法
+  - 数据库自增
+
+- redis自增生成的id结构：**时间戳+自增id**
+
+  ![](./assets/Snipaste_2024-01-16_17-21-10.jpg)
+
+  - key以天为单位，即每天一个key，方便统计订单量
+
+    ```java
+    long count = stringRedisTemplate.opsForValue().increment("inr:" + keyPrefix + ":" + date);
+    ```
+
+### 3.2 实现优惠券秒杀下单
+
+- 三张表
+  - `tb_voucher`：优惠券表
+  - `tb_seckill_voucher`：秒杀券表，有一个`voucher_id`指向`tb_voucher`表中对应的订单（**垂直分表**）；
+  - `tb_voucher_order`：订单表，`id`使用**全局唯一`id`生成器**生成
