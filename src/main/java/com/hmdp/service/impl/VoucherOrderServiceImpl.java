@@ -73,7 +73,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         if (count > 0) {
             return Result.fail("用户已经购买过一次!");
         }
-        // 更新优惠券库存
+        // 更新优惠券库存（基于乐观锁的思想：更新时判断stock是否大于0）
         boolean success = seckillVoucherService.update().setSql("stock = stock - 1")
                 .eq("voucher_id", voucherId).gt("stock", 0)
                 .update();
