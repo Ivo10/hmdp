@@ -266,3 +266,50 @@
 - 删除锁时，判断value是否为当前线程
 
   ![](./assets/Snipaste_2024-01-27_16-15-55.jpg)
+
+#### 3.5.3 使用lua脚本继续改进分布式锁
+
+- 前两版本分布式锁存在的问题
+
+  ![](./assets/Snipaste_2024-01-28_10-29-46.jpg)
+
+  - 线程1判断锁标识一致后阻塞，触发了超时释放
+  - 线程2从而获取到了锁，执行业务
+  - 线程1阻塞完毕，引发误删
+  - **根本原因**：**判断锁一致和删除锁的过程不是原子的**，解决办法：lua脚本实现
+
+- 判断锁一致和删除锁的lua脚本
+
+  ```lua
+  -- 判断线程标识是否一致
+  if (redis.call('get', KEYS[1]) == ARGV[1]) then
+      return redis.call('del', KEYS[1])
+  end
+  return 0
+  ```
+
+- 使用`RedisTemplate`调用lua脚本
+
+  - 设置脚本的路径和返回类型
+
+    ```java
+    private static final DefaultRedisScript<Long> UNLOCK_SCRIPT;
+    
+    static {
+        UNLOCK_SCRIPT = new DefaultRedisScript<>();
+        UNLOCK_SCRIPT.setLocation(new ClassPathResource("unlock.lua"));
+        UNLOCK_SCRIPT.setResultType(Long.class);
+    }
+    ```
+
+  - 调用脚本
+
+    ```java
+    public void unlock() {
+        stringRedisTemplate.execute(UNLOCK_SCRIPT,
+                                    Collections.singletonList(KEY_PREFIX + name),
+                                    ID_PREFIX + Thread.currentThread().getId());
+    }
+    ```
+
+    
